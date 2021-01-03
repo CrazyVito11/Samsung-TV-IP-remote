@@ -9,67 +9,45 @@ namespace Samsung_TV_IP_remote
 {
     class Program
     {
+        private static TCPClient client;
         static void Main(string[] args)
         {
             Console.WriteLine("{0} V{1}", Assembly.GetExecutingAssembly().GetName().Name, Assembly.GetExecutingAssembly().GetName().Version);
             Console.WriteLine("-------------------------------------------\n");
-            Connect("10.70.0.68", 55000);
+
+            //Connect("10.70.0.68", 55000);
+
+            client = new TCPClient();
+
+            client.OnConnecting   += OnConnecting;
+            client.OnConnect      += OnConnect;
+            client.OnDataReceived += DataReceived;
+
+            client.Connect("10.70.0.68", 55000);
+           
             Console.ReadLine();
         }
 
-        static void Connect(String server, Int32 port)
+        static void OnConnecting(string remoteIp, int port)
         {
-            try
-            {
-                // Create a TcpClient
-                Console.WriteLine("Connecting to {0}...", server);
-                TcpClient client = new TcpClient(server, port);
-
-                // Translate the passed message into ASCII and store it as a Byte array.
-                //Byte[] data = System.Text.Encoding.ASCII.GetBytes(message);
-                Byte[] data = authenticateHeader();
-
-                // Get a client stream for reading and writing.
-                //  Stream stream = client.GetStream();
-
-                NetworkStream stream = client.GetStream();
-
-                // Send the message to the connected TcpServer.
-                stream.Write(data, 0, data.Length);
-
-                Console.WriteLine("Sent authentication data");
-
-                // Receive the TcpServer.response.
-
-                // Buffer to store the response bytes.
-                data = new Byte[256];
-
-                // String to store the response ASCII representation.
-                String responseData = String.Empty;
-
-                // Read the first batch of the TcpServer response bytes.
-                Int32 bytes = stream.Read(data, 0, data.Length);
-                responseData = System.Text.Encoding.ASCII.GetString(data, 0, bytes);
-                Console.WriteLine("Received: {0}", responseData);
-
-                // Close everything.
-                stream.Close();
-                client.Close();
-            }
-            catch (ArgumentNullException e)
-            {
-                Console.WriteLine("ArgumentNullException: {0}", e);
-            }
-            catch (SocketException e)
-            {
-                Console.WriteLine("SocketException: {0}", e);
-            }
-
-            Console.WriteLine("\n Press Enter to continue...");
-            Console.Read();
+            Console.Write("Connecting to {0}...", remoteIp);
         }
 
-        public static Byte[] authenticateHeader()
+        static void OnConnect(string remoteIp, int port)
+        {
+            Console.WriteLine(" OK");
+            Console.Write("Authenticating...");
+
+            client.SendImmediate(authenticateHeader());
+        }
+
+        static void DataReceived(byte[] data, int bytesRead)
+        {
+            Console.WriteLine(Encoding.ASCII.GetString(data, 0, bytesRead));
+            Console.WriteLine(byteArrayToPrintedHex(data, bytesRead));
+        }
+
+        public static byte[] authenticateHeader()
         {
             byte[] headerBeginning = { 0x00, 0x13, 0x00 };
             byte[] appName         = Encoding.ASCII.GetBytes("iphone.iapp.samsung");
@@ -105,15 +83,19 @@ namespace Samsung_TV_IP_remote
             return newByteArray;
         }
 
-        private static string byteArrayToPrintedHex(byte[] data)
+        private static string byteArrayToPrintedHex(byte[] data, int length = 0)
         {
-            string builder = "";
-            string bitdata = BitConverter.ToString(data);
+            string builder        = "";
+            string bitdata        = BitConverter.ToString(data);
+            int counter           = 0;
             Array bitdataExploded = bitdata.Split('-');
 
-            foreach(String item in bitdataExploded)
+            foreach (String item in bitdataExploded)
             {
+                if (length != 0 && counter > length) break;
+
                 builder += "0x" + item + " ";
+                counter++;
             }
 
             return builder;
