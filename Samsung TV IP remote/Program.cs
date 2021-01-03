@@ -72,16 +72,14 @@ namespace Samsung_TV_IP_remote
         public static Byte[] authenticateHeader()
         {
             byte[] headerBeginning = { 0x00, 0x13, 0x00 };
-            byte[] appName = Encoding.ASCII.GetBytes("iphone.iapp.samsung");
+            byte[] appName         = Encoding.ASCII.GetBytes("iphone.iapp.samsung");
 
             byte[] payloadHeader = { 0x64, 0x00 };
-            byte[] machineIp = Base64EncodeWithLength(getMachineIP());
-            byte[] uniqueID  = Base64EncodeWithLength("00:00:00:00:00");
-            byte[] name      = Base64EncodeWithLength("OwO");
-            byte[] payload   = CombineByteArray(payloadHeader, CombineByteArray(CombineByteArray(machineIp, uniqueID), name));
-
-            Byte[] payloadSizeRaw = BitConverter.GetBytes(payload.Length);
-            Byte[] payloadSize = { payloadSizeRaw[0], payloadSizeRaw[1] };
+            byte[] machineIp     = Base64EncodeWithLength(getMachineIP());
+            byte[] uniqueID      = Base64EncodeWithLength("00:00:00:00:00");
+            byte[] name          = Base64EncodeWithLength(Environment.MachineName);
+            byte[] payload       = CombineByteArray(payloadHeader, CombineByteArray(CombineByteArray(machineIp, uniqueID), name));
+            byte[] payloadSize   = getFirstTwoBytes(BitConverter.GetBytes(payload.Length));
 
             byte[] authenticationPackage = CombineByteArray(headerBeginning, CombineByteArray(appName, CombineByteArray(payloadSize, payload)));
             return authenticationPackage;
@@ -90,21 +88,27 @@ namespace Samsung_TV_IP_remote
         public static string Base64Encode(string plainText)
         {
             var plainTextBytes = Encoding.ASCII.GetBytes(plainText);
-            return System.Convert.ToBase64String(plainTextBytes);
+            return Convert.ToBase64String(plainTextBytes);
         }
         public static byte[] Base64EncodeWithLength(string plainText)
         {
-            String base64Data = Base64Encode(plainText);
-            Byte[] datasize = BitConverter.GetBytes(base64Data.Length);
-            Byte[] datasizeNew = { datasize[0], datasize[1] };
+            string base64Data = Base64Encode(plainText);
+            byte[] dataSize   = getFirstTwoBytes(BitConverter.GetBytes(base64Data.Length));
 
-            return CombineByteArray(datasizeNew, Encoding.ASCII.GetBytes(base64Data));
+            return CombineByteArray(dataSize, Encoding.ASCII.GetBytes(base64Data));
         }
 
-        private static string byteArrayToPrintedHex(Byte[] data)
+        public static byte[] getFirstTwoBytes(byte[] originalByteArray)
         {
-            String builder = "";
-            String bitdata = BitConverter.ToString(data);
+            byte[] newByteArray = { originalByteArray[0], originalByteArray[1] };
+
+            return newByteArray;
+        }
+
+        private static string byteArrayToPrintedHex(byte[] data)
+        {
+            string builder = "";
+            string bitdata = BitConverter.ToString(data);
             Array bitdataExploded = bitdata.Split('-');
 
             foreach(String item in bitdataExploded)
@@ -121,7 +125,7 @@ namespace Samsung_TV_IP_remote
             int offset = 0;
             foreach (byte[] array in arrays)
             {
-                System.Buffer.BlockCopy(array, 0, rv, offset, array.Length);
+                Buffer.BlockCopy(array, 0, rv, offset, array.Length);
                 offset += array.Length;
             }
             return rv;
