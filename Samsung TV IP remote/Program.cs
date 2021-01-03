@@ -4,28 +4,37 @@ using System.Text;
 using System.Net;
 using System.Net.Sockets;
 using System.Reflection;
+using System.Diagnostics;
 
 namespace Samsung_TV_IP_remote
 {
     class Program
     {
         private static TCPClient client;
+        private static bool isAuthenticated = false;
+
         static void Main(string[] args)
         {
             Console.WriteLine("{0} V{1}", Assembly.GetExecutingAssembly().GetName().Name, Assembly.GetExecutingAssembly().GetName().Version);
             Console.WriteLine("-------------------------------------------\n");
 
-            //Connect("10.70.0.68", 55000);
-
             client = new TCPClient();
 
             client.OnConnecting   += OnConnecting;
-            client.OnConnect      += OnConnect;
+            client.OnConnected    += OnConnected;
             client.OnDataReceived += DataReceived;
+            client.OnDisconnect   += OnDisconnect;
 
             client.Connect("10.70.0.68", 55000);
            
             Console.ReadLine();
+        }
+
+        static void OnDisconnect()
+        {
+            isAuthenticated = false;
+
+            Console.WriteLine("Disconnected");
         }
 
         static void OnConnecting(string remoteIp, int port)
@@ -33,18 +42,54 @@ namespace Samsung_TV_IP_remote
             Console.Write("Connecting to {0}...", remoteIp);
         }
 
-        static void OnConnect(string remoteIp, int port)
+        static void OnConnected(string remoteIp, int port)
         {
             Console.WriteLine(" OK");
-            Console.Write("Authenticating...");
+            Console.Write("Authenticating... ");
 
             client.SendImmediate(authenticateHeader());
         }
 
         static void DataReceived(byte[] data, int bytesRead)
         {
-            Console.WriteLine(Encoding.ASCII.GetString(data, 0, bytesRead));
-            Console.WriteLine(byteArrayToPrintedHex(data, bytesRead));
+            short lengthHeaderText = BitConverter.ToInt16(data, 0x01);
+            short payloadOffset    = Convert.ToInt16(0x03 + lengthHeaderText + 0x02);
+            short lengthPayload    = BitConverter.ToInt16(data, 0x03 + lengthHeaderText);
+            string headerText      = Encoding.ASCII.GetString(data, 0x03, lengthHeaderText);
+            byte[] payload         = new byte[lengthPayload];        
+            Array.Copy(data, payloadOffset, payload, 0, lengthPayload);
+
+            if (payload[0] == 0x64)
+            {
+                if (payload[2] == 0x01)
+                {
+                    if (!isAuthenticated)
+                    {
+                        Console.WriteLine(" OK");
+                        isAuthenticated = true;
+                    }
+
+                }
+                else if (payload[2] == 0x00)
+                {
+                    if (!isAuthenticated)
+                    {
+                        Console.WriteLine(" FAILED\nThe device has rejected the request");
+                        client.Disconnect();
+                    }
+                    else
+                    {
+                        Console.WriteLine("The device has rejected the request");
+                    }
+                }
+            }
+            else if (payload[0] == 0x65 && payload[1] == 0x00)
+            {
+                Console.WriteLine(" FAILED\nThe request got canceled by the user or timed out");
+                client.Disconnect();
+            }
+
+            Debug.WriteLine(byteArrayToPrintedHex(payload, lengthPayload));
         }
 
         public static byte[] authenticateHeader()

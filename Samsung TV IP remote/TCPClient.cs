@@ -4,7 +4,7 @@ using System.Threading;
 
 namespace Samsung_TV_IP_remote
 {
-    public delegate void OnConnect(string remoteIp, int port);
+    public delegate void OnConnected(string remoteIp, int port);
     public delegate void OnConnecting(string remoteIp, int port);
     public delegate void OnDataReceived(byte[] data, int bytesRead); 
     public delegate void OnDisconnect();
@@ -12,7 +12,7 @@ namespace Samsung_TV_IP_remote
 
     class TCPClient
     {
-        public event OnConnect      OnConnect;
+        public event OnConnected    OnConnected;
         public event OnConnecting   OnConnecting;
         public event OnDataReceived OnDataReceived;
         public event OnDisconnect   OnDisconnect;
@@ -46,7 +46,7 @@ namespace Samsung_TV_IP_remote
             tcpClient = new TcpClient(ipAddress, port);
             clientStream = tcpClient.GetStream();
 
-            OnConnect(ipAddress, port);
+            OnConnected(ipAddress, port);
 
             Thread t = new Thread(new ThreadStart(ListenForPackets));
             started = true;
@@ -63,7 +63,10 @@ namespace Samsung_TV_IP_remote
                 return;
             }
 
-            OnDisconnect();
+            if (started)
+            {
+                OnDisconnect();
+            }
 
             tcpClient.Close();
 
